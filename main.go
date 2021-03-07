@@ -28,6 +28,8 @@ func main() {
 		c.HTML(http.StatusOK, "<h1>Hello Pin</h1>")
 	})
 
+	r.Static("/assets", "/Users/yq-sdk-zhuzhenwu/Documents")
+
 	v1 := r.Group("/v1")
 	v1.Use(onlyForV1(), onlyDoSomething())
 	{

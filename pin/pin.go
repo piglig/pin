@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"text/template"
 )
 
 type HandlerFunc func(c *Context)
@@ -18,8 +19,10 @@ type RouterGroup struct {
 
 type Engine struct {
 	*RouterGroup
-	router *router
-	groups []*RouterGroup
+	router       *router
+	groups       []*RouterGroup
+	htmlTemplate *template.Template
+	funcMap      template.FuncMap
 }
 
 func New() *Engine {
@@ -84,9 +87,21 @@ func (group *RouterGroup) createStaticHandler(relativePath string, fs http.FileS
 	absolutePath := path.Join(group.prefix, relativePath)
 	fileServer := http.StripPrefix(absolutePath, http.FileServer(fs))
 	return func(c *Context) {
-		file := c.Params("filepath")
+		file := c.Param("filepath")
+		if _, err := fs.Open(file); err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		fileServer.ServeHTTP(c.Writer, c.Req)
 
 	}
+}
+
+func (group *RouterGroup) Static(relativePath, root string) {
+	handler := group.createStaticHandler(relativePath, http.Dir(root))
+	urlPattern := path.Join(relativePath, "/*filepath")
+	group.GET(urlPattern, handler)
 }
 
 func (e *Engine) Run(addr string) (err error) {
