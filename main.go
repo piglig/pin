@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"pin"
+	"text/template"
 	"time"
 )
 
@@ -22,19 +24,56 @@ func onlyDoSomething() pin.HandlerFunc {
 	}
 }
 
+type Student struct {
+	Name string
+	Age  int8
+}
+
+func FormatAsDate(t time.Time) string {
+	year, month, day := t.Date()
+	return fmt.Sprintf("%d-%02d-%02d", year, month, day)
+}
+
 func main() {
-	r := pin.New()
-	r.GET("/", func(c *pin.Context) {
-		c.HTML(http.StatusOK, "<h1>Hello Pin</h1>")
+	r := pin.Default()
+
+	r.SetFuncMap(template.FuncMap{
+		"FormatAsDate": FormatAsDate,
+	})
+	r.LoadHTMLGlob("templates/*")
+
+	r.Static("/assets", "./static")
+
+	r.GET("/test", func(c *pin.Context) {
+		c.HTML(http.StatusOK, "css.tmpl", nil)
 	})
 
-	r.Static("/assets", "/Users/yq-sdk-zhuzhenwu/Documents")
+	stu1 := &Student{Name: "Geektutu", Age: 20}
+	stu2 := &Student{Name: "Jack", Age: 22}
+	r.GET("/students", func(c *pin.Context) {
+		c.HTML(http.StatusOK, "arr.tmpl", pin.H{
+			"title":  "pin",
+			"stuArr": [2]*Student{stu1, stu2},
+		})
+	})
+
+	r.GET("/panic", func(c *pin.Context) {
+		names := []string{"geektutu"}
+		c.String(http.StatusOK, names[100])
+	})
+
+	r.GET("/date", func(c *pin.Context) {
+		c.HTML(http.StatusOK, "custom_func.tmpl", pin.H{
+			"title": "pin",
+			"now":   time.Date(2019, 8, 17, 0, 0, 0, 0, time.UTC),
+		})
+	})
 
 	v1 := r.Group("/v1")
 	v1.Use(onlyForV1(), onlyDoSomething())
 	{
 		v1.GET("/", func(c *pin.Context) {
-			c.HTML(http.StatusOK, "<h1>Hello Pin</h1>")
+			c.String(http.StatusOK, "hello %s, you're at %s\n", c.Query("name"), c.Path)
 		})
 
 		v1.GET("/hello", func(c *pin.Context) {
